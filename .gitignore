@@ -1,0 +1,28 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local discovery / scratch data
+.tmp/
+tmp/
+scratch/
+raw-discovery/
+
+# Private infrastructure discovery / evidence
+inventory/discovered-infrastructure.md
+AGENTS.md
+
+# macOS
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# Private infrastructure discovery
+inventory/discovered-infrastructure.md
