@@ -156,7 +156,7 @@ Three container shims, Docker bridges, veth interfaces, and network namespaces s
 
 | Component | Placement | Relationship |
 |---|---|---|
-| IONOS VPS | External hosted system | Nginx terminates public HTTPS and proxies Jellyfin and Seerr directly over Tailscale. Separate iptables DNAT forwards configured game traffic over Tailscale to the on-demand game-server VM. The user reports hardening changes to the VPS tailnet role and IONOS ingress and administrative controls; these changes have not been independently verified in this repository. The VPS advertises no subnet routes and is not an exit node; detailed rules are omitted. |
+| IONOS VPS | External hosted system | Nginx terminates public HTTPS and proxies Jellyfin and Seerr directly over Tailscale. Separate iptables DNAT forwards configured game traffic over Tailscale to the on-demand game-server VM. This design keeps public forwarding on the VPS and Tailscale path; the VPS advertises no subnet routes and is not an exit node. Detailed filtering and peer-authorization rules are omitted. |
 | Proton VPN | External VPN provider | Carries qBittorrent external traffic and supplies its forwarded-port path. Configuration details are intentionally omitted. |
 | Proxmox backup target | Dedicated partition on Jellyfin host | Target for a backup job scheduled at 04:00 local time each day; retention keeps the latest seven and four weekly backups. Public documentation omits the local mount path. |
 | Media archive | Filesystems attached to Jellyfin host | Shared to Proxmox over NFS. It currently has no backup or replica because of budget constraints. |
