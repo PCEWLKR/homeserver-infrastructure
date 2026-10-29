@@ -12,7 +12,8 @@ This environment provides self-hosted media, automation, monitoring, reverse-pro
 flowchart TB
     USERS["Service users"]
     VPS["IONOS VPS<br/>public ingress relay"]
-    PUBPATH["Tailscale service path<br/>exact proxy hops not yet mapped"]
+    WEBPATH["VPS Nginx over Tailscale<br/>Jellyfin and Seerr"]
+    GAMEPATH["VPS iptables DNAT over Tailscale<br/>game VM when enabled"]
 
     subgraph LAN["Private home LAN"]
         subgraph PVE["Physical host: Getorli GT100"]
@@ -37,8 +38,9 @@ flowchart TB
 
         subgraph JHOST["Physical host: ASUS GL702VM"]
             JELLY["Jellyfin<br/>native system service"]
+            SEERR["Seerr<br/>Docker workload"]
             JDATA["Root filesystem<br/>RSYNC snapshot scope"]
-            DOCKER["Docker workloads<br/>Seerr; Prowlarr and Bazarr"]
+            DOCKER["Docker workloads<br/>Prowlarr and Bazarr"]
             NFS["Media filesystems<br/>NFS server"]
             NODE["Prometheus Node Exporter"]
             BACKUP["Dedicated Proxmox<br/>backup partition"]
@@ -47,9 +49,9 @@ flowchart TB
     end
 
     USERS --> VPS
-    VPS --> PUBPATH
-    PUBPATH -.->|"confirmed public destination"| JELLY
-    PUBPATH -.->|"confirmed destination when enabled"| VM100
+    VPS --> WEBPATH --> JELLY
+    WEBPATH --> SEERR
+    VPS --> GAMEPATH --> VM100
 
     NFS <-->|"Three NFSv4.2 media mounts"| PVEHOST
     PVEHOST -->|"Scheduled backups"| BACKUP
@@ -61,14 +63,13 @@ flowchart TB
     classDef inactive fill:#f4f4f5,stroke:#71717a,color:#3f3f46,stroke-dasharray:5 4;
     classDef not_yet_mapped fill:#fffaf0,stroke:#a87520,color:#4a3200,stroke-dasharray:5 4;
 
-    class PVEHOST,JELLY,JDATA,DOCKER,NODE physical;
+    class PVEHOST,JELLY,SEERR,JDATA,DOCKER,NODE physical;
     class L102,L106,L108,L109,L111,L112,VM100 virtual;
     class VM103 inactive;
-    class PUBPATH not_yet_mapped;
     class PVELOCAL,NFS,BACKUP,TSBACKUP storage;
 ```
 
-The diagram shows containment only where placement is established. The public traffic path is summarized here and described more carefully in [Network Architecture](network.md). Detailed reverse-proxy routing has not been documented.
+The diagram shows containment only where placement is established. The VPS's Nginx proxies public web requests directly to Jellyfin and Seerr over Tailscale; separate VPS iptables DNAT forwards game traffic to VM 100 over Tailscale when enabled. Neither path uses Nginx Proxy Manager (NPM), which is a separate application proxy in LXC 111. Exact endpoints and security policy are intentionally omitted. See [Network Architecture](network.md).
 
 ## Physical systems
 
@@ -158,7 +159,7 @@ qBittorrent uses Proton VPN for outbound traffic and is bound to the provider's 
 I haven't mapped every relationship below, and I keep security-sensitive configuration private:
 
 - Active Proxmox HA services do not imply a cluster; standalone operation is established.
-- The complete public request path through Nginx Proxy Manager, the VPS, and Tailscale is not confirmed.
+- Public web ingress and game forwarding are separate paths through the VPS and Tailscale; neither uses Nginx Proxy Manager. Exact routing and security policy remain private.
 - Exact firewall policy, DNS configuration, VLAN design, and application credentials are not documented.
 - Prometheus and Grafana are present, but I haven't mapped their LXC placement or full monitoring relationships.
 - Media archive files are not currently backed up or replicated.

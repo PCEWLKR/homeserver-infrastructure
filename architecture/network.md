@@ -106,7 +106,7 @@ The NPM administration interface was observed on the private LAN, and no NPM adm
 
 ## Tailscale and public ingress
 
-Tailscale connects the IONOS VPS and home hosts, carrying the confirmed web and game-server ingress paths. User-confirmed hardening has since applied least-privilege access controls to the VPS role and tightened IONOS ingress and administrative controls; implementation details are intentionally omitted.
+Tailscale connects the IONOS VPS and home hosts, carrying the confirmed web and game-server ingress paths. The user reports that hardening changes were applied to the VPS tailnet role and IONOS ingress and administrative controls; this repository has not independently verified those changes. Implementation details are intentionally omitted.
 
 Jellyfin and Seerr are the web services confirmed as intentionally public-facing. Public clients reach Nginx on the IONOS VPS over HTTPS; Nginx forwards requests directly over Tailscale to the Ubuntu media host, bypassing NPM. The VPS also forwards configured Minecraft and Project Zomboid game traffic with iptables DNAT over Tailscale to the on-demand game-server VM. These forwarding rules do not establish that guest applications are currently running or reachable. The VPS advertises no subnet routes and is not an exit node.
 
