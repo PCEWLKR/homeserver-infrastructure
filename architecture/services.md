@@ -8,6 +8,12 @@ This document maps known workloads to physical hosts and execution layers—nati
 
 ```mermaid
 flowchart TB
+    WEB_CLIENTS["External web clients"]
+    GAME_CLIENTS["External game clients"]
+    PRIVATE_CLIENTS["LAN / authorized private clients"]
+    VPS["IONOS VPS<br/>Nginx HTTPS / iptables DNAT"]
+    TS_OVERLAY["Tailscale overlay"]
+
     subgraph PHYSICAL["Physical infrastructure"]
         subgraph PVE["Getorli GT100 — Proxmox VE host"]
             PVECORE["Proxmox VE host layer"]
@@ -18,6 +24,7 @@ flowchart TB
                 C108["LXC 108<br/>Radarr"]
                 C109["LXC 109<br/>Sonarr"]
                 C111["LXC 111<br/>Nginx Proxy Manager"]
+                NPMLOCAL["NPM-local target<br/>application unknown"]
                 C112["LXC 112<br/>SABnzbd"]
                 MON["Prometheus / Grafana processes<br/>exact guest not yet mapped"]
                 NESTED["Nested Docker/containerd<br/>exact guest not yet mapped"]
@@ -46,7 +53,23 @@ flowchart TB
         end
     end
 
-    C106 -->|"Proton VPN egress"| VPN["Proton VPN"]
+    WEB_CLIENTS --> VPS
+    GAME_CLIENTS --> VPS
+    PRIVATE_CLIENTS --> C111
+    VPS -->|"HTTPS reverse proxy"| TS_OVERLAY
+    VPS -->|"configured game forwarding"| TS_OVERLAY
+    TS_OVERLAY --> JELLY
+    TS_OVERLAY --> SEERR
+    TS_OVERLAY -->|"VM is on demand"| V100
+
+    C106 -->|"Proton VPN egress"| VPN
+    C111 -.->|"separate configured HTTP upstreams"| JELLY
+    C111 -.-> SEERR
+    C111 -.-> C106
+    C111 -.-> C108
+    C111 -.-> C109
+    C111 -.-> C112
+    C111 -.-> NPMLOCAL
     NFS <-->|"Host-level NFS mount relationship"| PVECORE
     PVECORE -->|"Scheduled Proxmox backup job"| JBACKUP
 
@@ -56,12 +79,14 @@ flowchart TB
     classDef native fill:#fff7e6,stroke:#a87520,color:#4a3200;
     classDef not_yet_mapped fill:#f4f4f5,stroke:#71717a,color:#3f3f46,stroke-dasharray:5 4;
     classDef external fill:#fdecec,stroke:#a94442,color:#4a1515;
+    classDef overlay fill:#eef3fb,stroke:#4777a8,color:#102a43;
 
     class C102,C106,C108,C109,C111,C112,SEERR container;
     class V100,V103 vm;
     class PVECORE,JELLY,NFS,NODE,TS,JBACKUP native;
     class MON,NESTED,PROWLARR,BAZARR not_yet_mapped;
-    class VPN external;
+    class WEB_CLIENTS,GAME_CLIENTS,PRIVATE_CLIENTS,VPS,VPN external;
+    class TS_OVERLAY overlay;
 ```
 
 Prowlarr and Bazarr run through Docker, but detailed container metadata and exact process-to-container mappings are unavailable. Prometheus, Grafana, and nested Docker/containerd run within the Proxmox LXC layer; no specific LXC assignment is made.
@@ -75,11 +100,11 @@ The Getorli GT100 runs Proxmox VE as a standalone virtualization host. Six activ
 | Guest | Workload | Layer | Baseline state | Architectural role |
 |---|---|---|---|---|
 | 102 | Prometheus PVE Exporter | Unprivileged LXC | Running | Exposes Proxmox telemetry to the monitoring system. |
-| 106 | qBittorrent | Unprivileged LXC | Running | Uses Proton VPN and its forwarded port; tested to fail closed when the VPN path drops. |
-| 108 | Radarr | Unprivileged LXC | Running | Media-automation workload. |
-| 109 | Sonarr | Unprivileged LXC | Running | Media-automation workload. |
-| 111 | Nginx Proxy Manager | Unprivileged LXC | Running | Reverse-proxy component; exact position in public request routing is not documented. |
-| 112 | SABnzbd | Unprivileged LXC | Running | Download-automation workload. |
+| 106 | qBittorrent | Unprivileged LXC | Running | Uses Proton VPN and its forwarded port; tested to fail closed when the VPN path drops. Its administrative interface is intended to remain private. |
+| 108 | Radarr | Unprivileged LXC | Running | Media-automation workload; its administrative interface is intended to remain private. |
+| 109 | Sonarr | Unprivileged LXC | Running | Media-automation workload; its administrative interface is intended to remain private. |
+| 111 | Nginx Proxy Manager | Unprivileged LXC | Running | Separate reverse proxy for seven configured application web interfaces; all upstreams use HTTP. It is not in the confirmed VPS public web or game-server ingress paths. |
+| 112 | SABnzbd | Unprivileged LXC | Running | Download-automation workload; its administrative interface is intended to remain private. |
 
 The Jellyfin host provides three media NFS exports to Proxmox, but per-guest mount assignments were inaccessible. Several LXC applications participate in media workflows, but this document does not claim that each guest directly mounts every export.
 
@@ -108,20 +133,20 @@ The ASUS GL702VM combines native media-serving and storage services with a small
 
 | Service | Layer | Architectural role |
 |---|---|---|
-| Jellyfin | Native systemd service | Primary media-serving application and one of two intentionally public-facing service paths. |
+| Jellyfin | Native systemd service | Primary media-serving application and one of two services intentionally exposed through IONOS VPS Nginx over Tailscale. VPS Nginx reaches Jellyfin directly rather than through NPM. |
 | NFS server | Native host service | Supplies three media-storage mounts to the Proxmox host. Exact export definitions are intentionally not documented. |
 | Prometheus Node Exporter | Native systemd service | Provides host telemetry. Scrape target configuration and alert relationships are not documented. |
 | Tailscale | Native host service | Connects the host to the overlay used by the IONOS VPS public ingress path. |
 | Docker Engine / containerd | Native runtime | Runs three container workloads, network namespaces, and related bridges. Detailed container metadata is unavailable. |
 | Timeshift | RSYNC-mode system snapshot mechanism | Configured for daily snapshots with retention of seven on a dedicated, separately mounted approximately 125 GB SSD. Large media filesystems and the replaceable downloads directory are excluded. A manual snapshot reported approximately 52 GB; historical OS and Jellyfin configuration/user-file restoration succeeded. |
 
-Jellyfin runs directly on the host rather than through Docker and uses the NVIDIA GTX 1060 for hardware transcoding. Parallel transcodes are uncapped.
+Jellyfin runs directly on the host rather than through Docker and uses the NVIDIA GTX 1060 for hardware transcoding. Parallel transcodes are uncapped. Public web requests arrive through Nginx on the IONOS VPS and travel over Tailscale directly to Jellyfin; Nginx Proxy Manager is not in this path.
 
 ### Docker workloads
 
 | Workload | Layer | Architectural role |
 |---|---|---|
-| Seerr | Docker workload | Media-request aggregator used by the service user community. |
+| Seerr | Docker workload | Media-request aggregator used by the service user community and the second service intentionally exposed through IONOS VPS Nginx over Tailscale. VPS Nginx reaches Seerr directly; NPM is not in this path. |
 | Prowlarr | Docker workload; detailed metadata unavailable | Media indexer-management application. |
 | Bazarr | Docker workload; detailed metadata unavailable | Subtitle-management application. |
 
@@ -131,7 +156,7 @@ Three container shims, Docker bridges, veth interfaces, and network namespaces s
 
 | Component | Placement | Relationship |
 |---|---|---|
-| IONOS VPS | External hosted system | Provides public ingress connectivity over Tailscale for Jellyfin and VM 100 when enabled. Its software stack is not documented. |
+| IONOS VPS | External hosted system | Nginx terminates public HTTPS and proxies Jellyfin and Seerr directly over Tailscale. Separate iptables DNAT forwards configured game traffic over Tailscale to the on-demand game-server VM. User-confirmed hardening has tightened the VPS tailnet role and IONOS ingress and administrative controls. The VPS advertises no subnet routes and is not an exit node; detailed rules are omitted. |
 | Proton VPN | External VPN provider | Carries qBittorrent external traffic and supplies its forwarded-port path. Configuration details are intentionally omitted. |
 | Proxmox backup target | Dedicated partition on Jellyfin host | Target for a backup job scheduled at 04:00 local time each day; retention keeps the latest seven and four weekly backups. Public documentation omits the local mount path. |
 | Media archive | Filesystems attached to Jellyfin host | Shared to Proxmox over NFS. It currently has no backup or replica because of budget constraints. |
@@ -156,7 +181,13 @@ The exporter, collector, and dashboard roles suggest a conventional telemetry fl
 
 ### Reverse proxy and public services
 
-Nginx Proxy Manager runs in LXC 111. Jellyfin and VM 100 are the only services confirmed as intentionally public-facing, using the IONOS VPS and Tailscale. The exact role of LXC 111 in either path has not been documented. Other services have no published inbound forwarding path, although they retain outbound connectivity.
+Nginx Proxy Manager runs in LXC 111 as a reverse proxy separate from the VPS ingress path. It has seven configured application hosts: Jellyfin, Seerr, qBittorrent, Radarr, Sonarr, SABnzbd, and one NPM-local loopback target whose application identity is unconfirmed. Jellyfin and Seerr route to services on the Jellyfin host; qBittorrent, Radarr, Sonarr, and SABnzbd route to internal Proxmox guests. All seven upstreams use HTTP.
+
+NPM has Let’s Encrypt certificates assigned to Jellyfin, Seerr, and SABnzbd. Force HTTPS and HTTP/2 are enabled for Jellyfin and Seerr. SABnzbd has a certificate assigned but does not force HTTPS redirection; HSTS is disabled on the certificate-backed hosts. These are NPM settings; VPS Nginx is a separate public HTTPS endpoint whose detailed TLS directives are not included here.
+
+The confirmed public web path is Internet → IONOS VPS Nginx → Tailscale → Jellyfin or Seerr directly. Game traffic follows a separate VPS iptables DNAT/forwarding path over Tailscale to the on-demand game-server VM. NPM is not part of either confirmed ingress path. qBittorrent, Radarr, Sonarr, and SABnzbd administrative interfaces are intended to remain private; limited unauthenticated checks did not establish public access but cannot prove every alternate route is blocked.
+
+NPM marks all seven hosts “Publicly Accessible,” meaning no NPM access list is assigned. This setting is not evidence of Internet reachability; if a request reaches one of these hosts through NPM, no NPM access-list restriction applies. The NPM administration UI was observed on the private LAN, and no administration proxy host appeared in the seven-host list. Detailed firewall and tailnet policy are intentionally omitted from this public documentation.
 
 ### Backup services
 
@@ -176,5 +207,4 @@ I haven't mapped the following placements or relationships, and I keep sensitive
 - current Minecraft and Project Zomboid installation/configuration inside powered-off VM 100;
 - Prowlarr and Bazarr container metadata;
 - per-guest NFS mount mapping;
-- Nginx Proxy Manager's exact request-routing role;
 - application versions, credentials, secrets, and detailed configuration.
