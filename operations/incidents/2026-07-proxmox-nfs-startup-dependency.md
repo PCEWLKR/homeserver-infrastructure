@@ -28,7 +28,7 @@ Jellyfin itself regained connectivity within approximately 10 minutes and remain
 - All three host-level NFS mounts were involved.
 - Monitoring through the later Prometheus/Grafana implementation was not available because that implementation was not complete at incident time.
 
-Nginx Proxy Manager impact was not established. No claim is made about workloads not specifically confirmed during the incident.
+Nginx Proxy Manager impact was not confirmed. No claim is made about workloads not specifically confirmed during the incident.
 
 ## Trigger and contributing conditions
 
@@ -182,7 +182,7 @@ The duration is a historical observation, not an RTO or guaranteed future recove
 
 - Exact timestamps, log excerpts, timeout values, and prior mount configuration were not retained.
 - Exact NFS export and bind-mount paths are intentionally omitted.
-- NFS availability monitoring is documented, but scrape and alert-delivery details remain unknown.
+- NFS availability monitoring is documented, but scrape and alert-delivery details have not been documented.
 - There is no second NFS server or replicated media archive.
 - Workloads start without NFS but cannot complete their intended media operations until shared storage returns.
 - Wake-on-LAN and automatic restart behavior are documented only at an architectural level, not as a tested procedural runbook.

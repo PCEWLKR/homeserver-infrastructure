@@ -24,7 +24,7 @@ This role combines media serving, storage, supporting applications, and backup t
 | GPU | NVIDIA GeForce GTX 1060 Mobile, 6 GB |
 | NVIDIA driver | Proprietary driver installed |
 
-The host runs Jellyfin natively rather than as a VM or Docker container. An NVIDIA persistence service was active, but active Jellyfin hardware transcoding was not established and is not assumed from GPU presence.
+The host runs Jellyfin natively rather than as a VM or Docker container. Jellyfin uses the NVIDIA GeForce GTX 1060 Mobile for hardware transcoding, with no cap on parallel transcodes.
 
 ## Storage model
 
@@ -44,13 +44,13 @@ The host combines system storage, application and staging capacity, portable sto
 
 The root filesystem is approximately 913 GB within an approximately 928 GB LVM-backed root volume. At baseline, it contained approximately 639 GB before exclusions; approximately 578 GB was in the explicitly excluded completed-downloads directory.
 
-A dedicated, separately mounted SSD of approximately 125 GB is configured as the Timeshift snapshot target. The relationship between this device and the approximately 120 GB internal SSD measurement is not established. Exact device identifiers, serial numbers, UUIDs, and mount paths are intentionally omitted.
+A dedicated, separately mounted SSD of approximately 125 GB is configured as the Timeshift snapshot target. The relationship between this device and the approximately 120 GB internal SSD measurement is not confirmed. Exact device identifiers, serial numbers, UUIDs, and mount paths are intentionally omitted.
 
 ### Media archive
 
-The attached high-capacity filesystems hold the media archive. High utilization is expected, including the filesystem that was full at baseline. The portable SSD also currently contains media, so its 98% utilization is expected; it is planned for later reuse as additional backup storage.
+The external HDDs hold the media archive. Their high utilization—including filesystems at or near 100%—is expected and acceptable for this media-storage role, not a problem by itself. The portable SSD also currently contains media, so its 98% utilization is expected; it is planned for later reuse as additional backup storage.
 
-The media archive currently has no backup or replica because of budget constraints. This is an accepted risk because the content is considered replaceable, although reacquisition after failure would require time and effort. During a historical disk failure, non-corrupted files were salvaged through an Ubuntu Server live environment and copied to a rescue drive; this was a partial salvage method, not proof of complete archive recoverability. Disk health and redundancy are not established.
+The media archive currently has no backup or replica because of budget constraints. This is an accepted risk because the content is considered replaceable, although reacquisition after failure would require time and effort. During a historical disk failure, non-corrupted files were salvaged through an Ubuntu Server live environment and copied to a rescue drive; this was a partial salvage method, not proof of complete archive recoverability. Disk health and redundancy are not confirmed.
 
 ### NFS service
 
@@ -71,13 +71,13 @@ Hosting this target on the media node separates backups from the Proxmox system 
 | Jellyfin | Primary media-serving application; active systemd service |
 | NFS server and RPC components | Export media storage to Proxmox |
 | Docker Engine and containerd | Run supporting media applications |
-| Prometheus Node Exporter | Expose host telemetry; scrape relationships unknown |
+| Prometheus Node Exporter | Expose host telemetry; scrape relationships not documented |
 | Tailscale | Connect the host to the overlay used by the public ingress path |
 | OpenSSH | Administrative access; publication details intentionally omitted |
-| NVIDIA persistence daemon | Maintain NVIDIA driver state; Jellyfin GPU use not established |
+| NVIDIA persistence daemon | Maintains NVIDIA driver state |
 | Timeshift | RSYNC-mode system snapshots; seven daily snapshots configured on a dedicated approximately 125 GB SSD |
 
-Jellyfin runs under a dedicated service account. Its version, application configuration, library-to-filesystem mapping, authentication settings, and active transcoding configuration are not documented.
+Jellyfin runs under a dedicated service account. Its version, application configuration, library-to-filesystem mapping, and authentication settings are not documented.
 
 ## Docker workloads
 
@@ -95,7 +95,7 @@ The three runtime instances align with these applications, although exact proces
 
 The host uses one active wired interface on the private home LAN. The default route uses the LAN gateway. A Wi-Fi interface was present but down at baseline.
 
-A Tailscale interface was active. Public Jellyfin access uses a domain-based entry point, an IONOS VPS, and the Tailscale overlay. During a historical 12-hour IONOS outage, about 10 of the environment's 20+ users temporarily accessed Jellyfin through a restricted, sanitized Tailscale path that bypassed the unavailable VPS route. Connectivity returned promptly for those users after they enabled the VPN; other users remained affected until the normal path recovered. Exact peer policy, reverse-proxy sequence, VPS software, DNS records, tunnel configuration, and Nginx Proxy Manager role remain unresolved or intentionally omitted.
+A Tailscale interface was active. Public Jellyfin access uses a domain-based entry point, an IONOS VPS, and the Tailscale overlay. During a historical 12-hour IONOS outage, about 10 of the environment's 20+ users temporarily accessed Jellyfin through a restricted, sanitized Tailscale path that bypassed the unavailable VPS route. Connectivity returned promptly for those users after they enabled the VPN; other users remained affected until the normal path recovered. I haven't mapped the full peer policy, reverse-proxy sequence, or Nginx Proxy Manager's role. I keep exact VPS, DNS, and tunnel configuration private.
 
 The host also provides:
 
@@ -104,15 +104,15 @@ The host also provides:
 - outbound connectivity for normal host and application operations;
 - no intentionally published inbound paths for other host or Docker services.
 
-The last point describes intended exposure, not established firewall behavior. Exact IP addresses, domains, firewall rules, Docker publication configuration, and Tailscale ACLs are not documented.
+The last point describes intended exposure, not confirmed firewall behavior. Exact IP addresses, domains, firewall rules, Docker publication configuration, and Tailscale ACLs are not documented.
 
 ## Monitoring
 
 Prometheus Node Exporter runs directly on this host. This establishes a host telemetry endpoint, but its collector, scrape interval, authentication, retention, dashboards, and alert routing are not documented.
 
-Prometheus and Grafana processes run within the Proxmox-hosted LXC layer, but their exact placement and relationship to this Node Exporter are unresolved. No complete monitoring flow is asserted.
+Prometheus and Grafana processes run within the Proxmox-hosted LXC layer, but I haven't mapped their guest placement or relationship to this Node Exporter. I don't infer a complete monitoring flow.
 
-Storage utilization is an important operational signal because several archive filesystems are intentionally near capacity. No alert thresholds or capacity policy were established.
+The external HDDs are media disks; high utilization, including full filesystems, is expected and acceptable. Capacity monitoring should distinguish this normal archive usage from unexpected growth on system or staging filesystems. No alert thresholds or capacity policy were established.
 
 ## Backup strategy
 
@@ -126,13 +126,13 @@ An initial manual Timeshift snapshot was created on 2026-10-01 and reported a si
 
 Timeshift was successfully used after a historical root-filesystem failure caused by improper administrative commands. It restored the operating system and important Jellyfin configuration and user files. Total service downtime was approximately two hours, and important data was preserved. The isolated restore-operation duration and a complete file manifest were not recorded.
 
-Seerr, Bazarr, and Prowlarr configuration files were copied manually during recovery and are now included in Timeshift scope. Whether the current snapshot contains them is not established, and restoration of the current Docker configuration has not been separately tested.
+Seerr, Bazarr, and Prowlarr configuration files were copied manually during recovery and are now included in Timeshift scope. Whether the current snapshot contains them is not confirmed, and restoration of the current Docker configuration has not been separately tested.
 
 ### Proxmox backup target
 
 The dedicated backup partition on this host is the target for the Proxmox job scheduled at 04:00 local time each day. Proxmox retention keeps the latest seven backups and four weekly backups.
 
-The Proxmox backup target and Timeshift snapshot SSD reduce dependence on the Proxmox system disk, but both remain within the same local two-host environment. Whether they share any lower-level storage failure domain is not established. No off-site backup relationship exists.
+The Proxmox backup target and Timeshift snapshot SSD reduce dependence on the Proxmox system disk, but both remain within the same local two-host environment. Whether they share any lower-level storage failure domain is not confirmed. No off-site backup relationship exists.
 
 ### Media protection
 
@@ -156,7 +156,7 @@ The Proxmox host depends on this node for NFS and backup storage, while this nod
 ## Operational considerations
 
 - **Concentrated role:** one physical host provides Jellyfin, shared media, NFS, Docker workloads, the Timeshift snapshot target, and the Proxmox backup target.
-- **Archive capacity:** filesystems at 96–100% utilization are expected archival conditions, but they leave limited growth headroom.
+- **Archive capacity:** external HDDs are media disks, so 96–100% utilization is expected and acceptable for their role; it is not by itself an incident indicator.
 - **Single-copy media:** the archive is not replicated or backed up; recovery depends on reacquiring replaceable content.
 - **System capacity:** the root filesystem was 74% used at baseline.
 - **Portable SSD transition:** current high use is expected, and the device's future backup role is not yet active.
