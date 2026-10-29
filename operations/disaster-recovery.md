@@ -29,14 +29,14 @@ Recovery order is event-dependent rather than a single fixed sequence. The follo
 | Preserve recoverable data | Avoid overwriting salvageable system or media data during a storage event | Historical media recovery copied non-corrupted files to a rescue drive from a live environment |
 | Restore physical-host operation | Recover the affected operating system sufficiently to provide its host role | Timeshift successfully restored the Jellyfin OS after a root-filesystem failure |
 | Restore configuration and user state | Recover important Jellyfin configuration and user files | The historical Timeshift restore recovered these items |
-| Restore Proxmox workloads | Recover required guests from the Proxmox backup set when necessary | VM 100 was successfully restored as a test; complete guest coverage remains unknown |
+| Restore Proxmox workloads | Recover required guests from the Proxmox backup set when necessary | VM 100 was successfully restored as a test; complete guest coverage has not been documented |
 | Restore shared storage availability | Re-establish NFS-dependent media access without blocking the Proxmox host itself | Current mount behavior permits Proxmox startup while an unavailable share reports a warning |
 | Restore service access | Re-establish normal VPS/Tailscale ingress or provide restricted fallback access | Restricted Tailscale access restored Jellyfin connectivity for approximately 10 users during a VPS outage |
 | Recover replaceable media | Salvage readable files first, then reacquire missing or corrupted media | Historical disk salvage supports this approach; the archive remains dependent on reacquisition |
 
 This table describes goals and dependencies, not a fixed procedural order for every failure scenario.
 
-## Protected, replaceable, and unresolved data
+## Protected, replaceable, and open recovery questions
 
 ### Protected by established configuration
 
@@ -62,7 +62,7 @@ The Proxmox backup job is configured to:
 - target a dedicated partition on the Jellyfin host;
 - retain the latest seven backups and four weekly backups.
 
-VM 100 was successfully restored from backup as a test, and its expected state was recovered. Complete guest selection, routine job history, artifact integrity, and restore behavior for other guests remain unknown.
+VM 100 was successfully restored from backup as a test, and its expected state was recovered. Complete guest selection, routine job history, artifact integrity, and restore behavior for other guests have not been documented.
 
 ### Explicitly replaceable or unprotected
 
@@ -76,7 +76,7 @@ The reacquisition pipeline has been used operationally and is supported by prior
 
 Seerr, Bazarr, and Prowlarr configuration files were copied manually during the historical recovery and are now included in Timeshift scope. Their current snapshot presence has not been independently inspected, and the current Docker configuration has not been separately restore-tested.
 
-The exact Proxmox backup scope is also unknown. VM 100 recovery succeeded in one test, but that result does not show protection for all LXCs, VM 103, host configuration, or every current guest disk.
+The exact Proxmox backup scope is also not documented. VM 100 recovery succeeded in one test, but that result does not show protection for all LXCs, VM 103, host configuration, or every current guest disk.
 
 ## Dependency and failure analysis
 
@@ -103,11 +103,11 @@ NFS is a shared-service dependency between the physical hosts. During a storm-re
 
 The Proxmox host mount configuration now uses `nofail` with a reduced timeout. Storage is mounted at the host layer and selected paths are exposed to qBittorrent, Sonarr, Radarr, and SABnzbd. A deliberate test with the Jellyfin host powered off confirmed that Proxmox and its LXCs start in a degraded state. Applications can run, but media functions remain unavailable until NFS returns.
 
-Automatic restart and Wake-on-LAN procedures were enabled for the Jellyfin host. NFS availability is now monitored through Prometheus and Grafana; exact scrape and alert behavior remain unknown.
+Automatic restart and Wake-on-LAN procedures were enabled for the Jellyfin host. NFS availability is now monitored through Prometheus and Grafana; exact scrape and alert behavior have not been documented.
 
 ### Public ingress
 
-Normal public Jellyfin and game-service paths depend on an IONOS VPS and Tailscale. The exact reverse-proxy chain remains unresolved.
+Normal public Jellyfin and game-service paths depend on an IONOS VPS and Tailscale. The exact reverse-proxy chain has not yet been mapped.
 
 During a historical IONOS outage, the normal public path was unavailable for approximately 12 hours. About 10 of the 20+ users had access to a restricted, sanitized Tailscale path and restored Jellyfin connectivity promptly after enabling the VPN. Users without that access remained affected until the provider path recovered.
 

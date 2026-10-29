@@ -13,7 +13,7 @@ flowchart LR
     CLIENTS["Public service clients"]
     INTERNET["Internet"]
     VPS["IONOS VPS<br/>public ingress"]
-    INGRESSPATH["Tailscale service routing<br/>exact proxy hops unresolved"]
+    INGRESSPATH["Tailscale service routing<br/>exact proxy hops not yet mapped"]
     PROTON["Proton VPN<br/>qBittorrent egress and<br/>provider-forwarded port"]
 
     subgraph HOME["Home environment"]
@@ -22,7 +22,7 @@ flowchart LR
 
         subgraph PVE["Proxmox physical host"]
             PHOST["Proxmox host<br/>primary Linux bridge"]
-            NPM["LXC 111<br/>Nginx Proxy Manager<br/>public-path role unresolved"]
+            NPM["LXC 111<br/>Nginx Proxy Manager<br/>public-path role not yet mapped"]
             QBIT["LXC 106<br/>qBittorrent"]
             GAME["VM 100<br/>game server<br/>off at baseline"]
             INTERNAL["Other Proxmox workloads<br/>no published inbound path"]
@@ -68,7 +68,7 @@ flowchart LR
     class NPM,INGRESSPATH uncertain;
 ```
 
-Nginx Proxy Manager is in LXC 111, but its participation in the VPS-to-service request path is unknown. The diagram therefore shows its placement without connecting it to an unverified routing relationship.
+Nginx Proxy Manager is in LXC 111, but its participation in the VPS-to-service request path is not documented. The diagram shows its placement without implying a routing relationship.
 
 ## Home LAN
 
@@ -78,7 +78,7 @@ Both hosts have Wi-Fi hardware, but their wireless interfaces were down at basel
 
 ### Internal service reachability
 
-Services other than Jellyfin and the game-server path have no published inbound forwarding path. They may initiate outbound connections. The exposure model describes intended publication; implementation details remain unknown.
+Services other than Jellyfin and the game-server path have no published inbound forwarding path. They may initiate outbound connections. The exposure model describes intended publication; implementation details have not been documented.
 
 Internal-only or non-published services include the Proxmox management plane, monitoring components, media automation workloads, download automation, NFS, SSH administration, and the media-supporting Docker applications unless they are reached from an already authorized internal path.
 
@@ -97,7 +97,7 @@ During a historical 12-hour IONOS outage, about 10 of the environment's 20+ user
 
 This design avoids relying on direct publication of the broader home LAN. Exact domains, public addresses, tunnel addresses, VPS listener configuration, and cryptographic material are intentionally omitted.
 
-The complete sequence of reverse-proxy hops is still unknown. Nginx Proxy Manager is present, but its relationship to the VPS and each public service was not verified and is not asserted in the diagram.
+The complete sequence of reverse-proxy hops remains undocumented. Nginx Proxy Manager is present, but its relationship to the VPS and each public service is not shown in the diagram.
 
 ## qBittorrent and Proton VPN
 
@@ -106,7 +106,7 @@ qBittorrent runs in unprivileged LXC 106. Its external connectivity has two deli
 - outbound qBittorrent traffic uses Proton VPN rather than the normal LAN egress path;
 - qBittorrent is bound to the port forwarded by Proton VPN.
 
-This is a workload-specific traffic-isolation decision. No VPN endpoint, address, credential, protocol configuration, firewall rule, or forwarded port number is recorded. Detailed leak-prevention or fail-closed behavior was not inspected and must not be assumed.
+qBittorrent fails closed when the VPN path drops; it does not fall back to normal LAN egress. This behavior has been tested. VPN endpoints, addresses, credentials, protocol configuration, firewall rules, and forwarded port numbers are intentionally omitted.
 
 ## NFS storage traffic
 
@@ -116,13 +116,13 @@ The exact export definitions, per-client permissions, and mapping of individual 
 
 A storm-related power outage caused Proxmox to start before the Jellyfin/NFS host. All three mounts entered a persistent blocking state that affected the Proxmox web interface and media-management workloads. The host mount configuration was changed afterward to use `nofail` with a reduced timeout so unavailable NFS shares produce degraded behavior rather than blocking startup.
 
-The remediation was tested by powering off the Jellyfin host. Proxmox and its LXCs started normally while media functions remained degraded until NFS returned. Automatic restart behavior and Wake-on-LAN procedures were also enabled for the Jellyfin host. NFS availability is now monitored through Prometheus and Grafana, although exact scrape and alert configuration remains unknown.
+The remediation was tested by powering off the Jellyfin host. Proxmox and its LXCs started normally while media functions remained degraded until NFS returned. Automatic restart behavior and Wake-on-LAN procedures were also enabled for the Jellyfin host. NFS availability is now monitored through Prometheus and Grafana, although exact scrape and alert configuration has not been documented.
 
 ## Host-local container networking
 
 The Jellyfin host had three active Docker bridges, three virtual Ethernet interfaces, and three Docker network namespaces supporting Seerr, Bazarr, and Prowlarr. Seerr's published listener was mapped directly; exact process-to-container mappings for Bazarr and Prowlarr remain unavailable. Container network names, address ranges, and detailed publication rules remain undocumented.
 
-On Proxmox, six LXC virtual Ethernet interfaces were attached to the primary bridge. Docker/containerd processes were also visible inside the LXC process tree, indicating nested container activity, but the responsible guest and network design were not established.
+On Proxmox, six LXC virtual Ethernet interfaces were attached to the primary bridge. Docker/containerd processes were also visible inside the LXC process tree, indicating nested container activity, but the responsible guest and network design were not confirmed.
 
 ## Traffic and exposure summary
 
@@ -133,11 +133,11 @@ On Proxmox, six LXC virtual Ethernet interfaces were attached to the primary bri
 | Proxmox host | Jellyfin host | Three NFSv4.2 media mounts | Private LAN relationship |
 | qBittorrent LXC | Proton VPN / Internet | Isolated application egress | Provider-forwarded port; details omitted |
 | LAN clients | Internal applications and management services | Local service use and administration | No intentionally published inbound Internet path |
-| Both physical hosts | Tailscale overlay | Overlay connectivity | Peer policy and complete reachability unknown |
+| Both physical hosts | Tailscale overlay | Overlay connectivity | Peer policy and complete reachability not documented |
 | Approximately 10 trusted users | Restricted Tailscale path to Jellyfin | Temporary access during a 12-hour normal VPS-path outage | Access returned promptly after VPN activation; exact peers and policy omitted |
 | Proxmox host | Jellyfin backup partition | Scheduled Proxmox backups | Internal storage path; filesystem path omitted here |
 
-## Security boundaries and unknowns
+## Security boundaries and private details
 
 The architecture establishes separation between private LAN traffic, Tailscale-based public paths, and qBittorrent's Proton VPN path. It does not establish:
 
@@ -148,6 +148,6 @@ The architecture establishes separation between private LAN traffic, Tailscale-b
 - whether Nginx Proxy Manager handles one or both public services;
 - Docker publication policy beyond the current listeners;
 - VLANs or other LAN segmentation;
-- VPN fail-closed behavior for qBittorrent.
+- Detailed VPN implementation and qBittorrent's fail-closed configuration.
 
-These items remain unknown or intentionally withheld.
+I keep exact firewall, DNS, Tailscale, VPN, and VPS settings private. I have not mapped the complete reverse-proxy request path, so the diagrams avoid implying specific routing.
