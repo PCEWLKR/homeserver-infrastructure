@@ -12,7 +12,7 @@ This environment provides self-hosted media, automation, monitoring, reverse-pro
 flowchart TB
     USERS["Service users"]
     VPS["IONOS VPS<br/>public ingress relay"]
-    PUBPATH["Tailscale service path<br/>exact proxy hops unresolved"]
+    PUBPATH["Tailscale service path<br/>exact proxy hops not yet mapped"]
 
     subgraph LAN["Private home LAN"]
         subgraph PVE["Physical host: Getorli GT100"]
@@ -59,16 +59,16 @@ flowchart TB
     classDef virtual fill:#eef3fb,stroke:#4777a8,color:#102a43;
     classDef storage fill:#fff7e6,stroke:#a87520,color:#4a3200;
     classDef inactive fill:#f4f4f5,stroke:#71717a,color:#3f3f46,stroke-dasharray:5 4;
-    classDef unresolved fill:#fffaf0,stroke:#a87520,color:#4a3200,stroke-dasharray:5 4;
+    classDef not_yet_mapped fill:#fffaf0,stroke:#a87520,color:#4a3200,stroke-dasharray:5 4;
 
     class PVEHOST,JELLY,JDATA,DOCKER,NODE physical;
     class L102,L106,L108,L109,L111,L112,VM100 virtual;
     class VM103 inactive;
-    class PUBPATH unresolved;
+    class PUBPATH not_yet_mapped;
     class PVELOCAL,NFS,BACKUP,TSBACKUP storage;
 ```
 
-The diagram shows containment only where placement is established. The public traffic path is summarized here and described more carefully in [Network Architecture](network.md). Detailed reverse-proxy routing remains unknown.
+The diagram shows containment only where placement is established. The public traffic path is summarized here and described more carefully in [Network Architecture](network.md). Detailed reverse-proxy routing has not been documented.
 
 ## Physical systems
 
@@ -80,7 +80,7 @@ Its primary role is workload isolation and lifecycle management through six unpr
 
 ### Jellyfin media host
 
-The ASUS GL702VM runs Ubuntu Server 24.04 and Jellyfin as a native system service. It provides the media-serving role, attached storage, NFS exports, and a Docker runtime for supporting media applications. The host also has an NVIDIA GTX 1060 Mobile GPU; whether Jellyfin currently uses GPU acceleration is unknown.
+The ASUS GL702VM runs Ubuntu Server 24.04 and Jellyfin as a native system service. It provides the media-serving role, attached storage, NFS exports, and a Docker runtime for supporting media applications. Jellyfin uses the host's NVIDIA GTX 1060 Mobile for hardware transcoding, with no cap on parallel transcodes.
 
 The media host is a shared infrastructure dependency. It supplies three media-storage NFS mounts to Proxmox and holds the dedicated partition used as the Proxmox backup target. This consolidation reduces hardware requirements but creates a dependency on the media host for shared storage and Proxmox backup availability.
 
@@ -95,7 +95,7 @@ The Proxmox host uses unprivileged LXCs for long-running, narrowly scoped servic
 - Nginx Proxy Manager through LXC 111
 - SABnzbd through LXC 112
 
-Docker/containerd, Prometheus, Grafana, Node.js, and Python also appear within Proxmox-hosted LXC process trees, but their exact guest placement is unresolved. They are not assigned to a specific LXC or treated as separately identified services.
+Docker/containerd, Prometheus, Grafana, Node.js, and Python also appear within Proxmox-hosted LXC process trees, but I haven't mapped each process to a guest. I don't assign them to a specific LXC or treat them as separately identified services without that mapping.
 
 The two known QEMU workloads use complete guest operating systems. VM 100 provides the game-server environment and has hosted Minecraft and Project Zomboid. VM 103 supported historical Windows Server and domain-controller experimentation but is inactive and outside the current service scope.
 
@@ -107,7 +107,7 @@ See [Service Placement](services.md) for the complete placement summary.
 
 The Proxmox host uses local LVM-thin storage for guest volumes and mounts three NFSv4.2 media exports from the Jellyfin host. These exports provide media storage. Exact export-to-guest mappings were not available, so individual LXC access to each export is not asserted.
 
-The Jellyfin host combines its system disk with internal, portable, and external storage. Several media filesystems are intentionally near capacity because they hold archival media. The archive currently has no replica or backup because of budget constraints; the accepted recovery approach is to reacquire replaceable media if a disk fails.
+The Jellyfin host combines its system disk with internal, portable, and external storage. The external HDDs hold the media archive; high utilization, including full filesystems, is expected and acceptable for this role. The archive currently has no replica or backup because of budget constraints; the accepted recovery approach is to reacquire replaceable media if a disk fails.
 
 System and configuration data receive separate protection:
 
@@ -115,14 +115,14 @@ System and configuration data receive separate protection:
 - A Proxmox backup job is configured for 04:00 local time each day, targeting a dedicated partition on the Jellyfin host. Retention keeps the latest seven backups and four weekly backups.
 - A currently media-filled portable SSD is planned for later use as additional backup storage.
 
-Timeshift has successfully restored the operating system and important Jellyfin configuration/user files after a historical root-filesystem failure. Total service downtime was approximately two hours, and important data was preserved. Seerr, Bazarr, and Prowlarr configuration was copied manually during recovery and is now within Timeshift scope, but the current Docker configuration has not been separately restore-tested. The isolated restore-operation duration and a complete restored-file manifest remain unknown.
+Timeshift has successfully restored the operating system and important Jellyfin configuration/user files after a historical root-filesystem failure. Total service downtime was approximately two hours, and important data was preserved. Seerr, Bazarr, and Prowlarr configuration was copied manually during recovery and is now within Timeshift scope, but the current Docker configuration has not been separately restore-tested. The isolated restore-operation duration and a complete restored-file manifest have not been documented.
 
 ## Monitoring
 
 Monitoring spans both physical hosts:
 
 - LXC 102 runs the Prometheus PVE Exporter.
-- Prometheus, Grafana, and `pve_exporter` run within the Proxmox-hosted LXC layer, but their precise guest placement is unresolved.
+- Prometheus, Grafana, and `pve_exporter` run within the Proxmox-hosted LXC layer, but I haven't mapped their precise guest placement.
 - Prometheus Node Exporter runs directly on the Jellyfin host.
 
 These components provide host and Proxmox telemetry, but the complete scrape topology, dashboard ownership, alert routing, and retention design are not yet documented.
@@ -135,7 +135,7 @@ Virtualized services run primarily on Proxmox, while Jellyfin and bulk media sto
 
 ### Use unprivileged LXCs for service isolation
 
-Each known Proxmox service has a dedicated unprivileged LXC, creating separate service lifecycle and container privilege boundaries rather than a single shared host deployment. At least one LXC also runs nested Docker workloads, but the exact placement is unresolved.
+Each known Proxmox service has a dedicated unprivileged LXC, creating separate service lifecycle and container privilege boundaries rather than a single shared host deployment. At least one LXC also runs nested Docker workloads, but I haven't identified which guest.
 
 ### Keep Proxmox standalone
 
@@ -151,15 +151,15 @@ Jellyfin and the game-server path use Tailscale connectivity to an IONOS VPS for
 
 ### Isolate qBittorrent egress
 
-qBittorrent uses Proton VPN for outbound traffic and is bound to the provider's forwarded port. This separates that workload's external traffic path from normal LAN egress. Sensitive VPN configuration is outside the documentation scope.
+qBittorrent uses Proton VPN for outbound traffic and is bound to the provider's forwarded port. It fails closed if the VPN path drops, preventing fallback to normal LAN egress; this behavior has been tested. Sensitive VPN configuration is outside the documentation scope.
 
 ## Known architectural limits
 
-The following points remain unresolved or intentionally omitted:
+I haven't mapped every relationship below, and I keep security-sensitive configuration private:
 
 - Active Proxmox HA services do not imply a cluster; standalone operation is established.
-- The complete public request path through Nginx Proxy Manager, the VPS, and Tailscale is not established.
+- The complete public request path through Nginx Proxy Manager, the VPS, and Tailscale is not confirmed.
 - Exact firewall policy, DNS configuration, VLAN design, and application credentials are not documented.
-- Prometheus and Grafana are present, but their exact LXC placement and full monitoring relationships remain unresolved.
+- Prometheus and Grafana are present, but I haven't mapped their LXC placement or full monitoring relationships.
 - Media archive files are not currently backed up or replicated.
 - Current application configuration inside powered-off VM 100 has not been inspected.

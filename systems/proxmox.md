@@ -47,7 +47,7 @@ Three read-write NFSv4.2 mounts originate from the Jellyfin physical host and se
 - two approximately 913 GiB exports at 74% utilization;
 - one approximately 458 GiB export at 98% utilization.
 
-High utilization of the media exports is expected because they hold archival media. Exact export names, paths, permissions, and per-LXC mount assignments are not documented.
+These NFS exports hold media from the external HDDs. High utilization, including full filesystems, is expected and acceptable for this archive; it is not an incident indicator by itself. Exact export names, paths, permissions, and per-LXC mount assignments are not documented.
 
 This design avoids duplicating large media data on the Proxmox NVMe device, but makes the Jellyfin host and home LAN dependencies for shared-media availability. During a storm-related power outage, Proxmox started before the Jellyfin/NFS host and all three mounts entered a persistent blocking state. The Proxmox web interface and media-management workflows were disrupted for approximately 45–60 minutes.
 
@@ -65,12 +65,12 @@ All six LXC guests were running at baseline. Their unprivileged configuration an
 | 106 | qBittorrent | Running | Media download workload with Proton VPN egress |
 | 108 | Radarr | Running | Media automation |
 | 109 | Sonarr | Running | Media automation |
-| 111 | Nginx Proxy Manager | Running | Reverse-proxy component; exact public-path role unknown |
+| 111 | Nginx Proxy Manager | Running | Reverse-proxy component; exact public-path role not documented |
 | 112 | SABnzbd | Running | Download automation |
 
 Each guest had a running per-container systemd unit, an `lxc-start` process, a bridge-attached virtual Ethernet interface, and a guest LVM volume. The separate LXCs create distinct service lifecycle and container privilege boundaries; guest configuration and effective isolation are outside this document.
 
-Docker/containerd runs within the Proxmox LXC layer, but the responsible guest and nested-container purpose remain unresolved. Prometheus, Grafana, Nginx, Node.js, and Python also run in that layer without reliable guest attribution, so they are not assigned to specific guests here. Detailed Proxmox guest configuration is not included.
+Docker/containerd runs within the Proxmox LXC layer, but the responsible guest and nested-container purpose have not yet been mapped. Prometheus, Grafana, Nginx, Node.js, and Python also run in that layer without reliable guest attribution, so they are not assigned to specific guests here. Detailed Proxmox guest configuration is not included.
 
 ### QEMU virtual machines
 
@@ -79,7 +79,7 @@ Docker/containerd runs within the Proxmox LXC layer, but the responsible guest a
 | 100 | Game server | Powered off at baseline; only VM currently in use |
 | 103 | Windows Server lab | Inactive and not recently used |
 
-VM 100 has hosted Minecraft and Project Zomboid. Its current in-guest installation and service state are not documented. When enabled, its public service path uses an IONOS VPS and Tailscale; exact routing and reverse-proxy hops remain unresolved.
+VM 100 has hosted Minecraft and Project Zomboid. Its current in-guest installation and service state are not documented. When enabled, its public service path uses an IONOS VPS and Tailscale; exact routing and reverse-proxy hops have not yet been mapped.
 
 VM 103 supported historical Windows Server and domain-controller experimentation. It does not represent a current Active Directory service and is outside the repository's current service scope. No additional guests are documented.
 
@@ -87,7 +87,7 @@ VM 103 supported historical Windows Server and domain-controller experimentation
 
 The host has one active wired uplink attached to a primary Linux bridge on the private home LAN. Six LXC veth interfaces were attached to that bridge at baseline. A wireless interface was present but down.
 
-A Tailscale interface and overlay routes were active. Tailscale participates in the public path for VM 100 when the game service is enabled and in broader environment connectivity, but peer policy and complete host-listener reachability are not established.
+A Tailscale interface and overlay routes were active. Tailscale participates in the public path for VM 100 when the game service is enabled and in broader environment connectivity, but peer policy and complete host-listener reachability are not confirmed.
 
 The intended exposure model is:
 
@@ -112,7 +112,7 @@ Monitoring on or beneath this host includes:
 - `pve_exporter`, Prometheus, and Grafana processes in the LXC process tree;
 - Proxmox statistics and RRD services on the physical host.
 
-NFS availability is monitored through Prometheus and Grafana following the historical startup-dependency incident. The exact LXC placement of Prometheus and Grafana, metric source, scrape relationships, alert routing, retention, and dashboard ownership are not established. The presence of these processes and NFS coverage does not establish a fully documented monitoring pipeline.
+NFS availability is monitored through Prometheus and Grafana following the historical startup-dependency incident. The exact LXC placement of Prometheus and Grafana, metric source, scrape relationships, alert routing, retention, and dashboard ownership are not confirmed. The presence of these processes and NFS coverage does not establish a fully documented monitoring pipeline.
 
 ## Backup strategy
 
@@ -142,7 +142,7 @@ The Jellyfin host is the most significant cross-host dependency. Its loss would 
 - **Standalone operation:** there is no second Proxmox node for host-level failover. Installed HA-related services must not be interpreted as active clustered HA.
 - **Root capacity:** the root filesystem was 86% used at baseline and warrants capacity trending, although no alert threshold or remediation policy was established.
 - **Shared-storage dependency:** media-facing workloads depend on NFS service and network connectivity to the Jellyfin host. `nofail` and reduced timeout behavior allow Proxmox and its LXCs to start without NFS, but dependent media functions remain degraded until storage recovers.
-- **Expected archive utilization:** the NFS mount at 98% is part of the accepted media-archive capacity model, not by itself an incident indicator.
+- **Expected archive utilization:** NFS exports backed by external media HDDs may be full; this is expected and acceptable for the archive, not by itself an incident indicator.
 - **Intermittent game workload:** VM 100 was intentionally off at baseline because of low current use.
 - **Security boundaries:** unprivileged LXCs are intentional; guest configuration and effective isolation are outside this document.
 - **Backup locality:** backups leave the Proxmox system disk but remain within the same two-host environment.

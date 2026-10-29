@@ -44,8 +44,8 @@ flowchart LR
 
 | Source | Mechanism and schedule | Target | Retention | Exclusions | Current status |
 |---|---|---|---|---|---|
-| Jellyfin physical host | Timeshift in RSYNC mode, configured daily | Dedicated, separately mounted approximately 125 GB SSD | 7 daily snapshots | Large media HDD filesystems and an explicitly excluded completed-downloads directory | Configuration and an approximately 52 GB manual snapshot are in place; a historical OS/Jellyfin configuration restore succeeded, but current file-level contents remain unverified |
-| Proxmox environment | Proxmox backup job, daily at 04:00 local time | Dedicated partition on the Jellyfin host | Latest 7 plus 4 weekly | Unknown | Schedule, target, and retention are configured; a VM 100 restore test succeeded, but current execution history and complete job scope were not inspected |
+| Jellyfin physical host | Timeshift in RSYNC mode, configured daily | Dedicated, separately mounted approximately 125 GB SSD | 7 daily snapshots | Large media HDD filesystems and an explicitly excluded completed-downloads directory | Configuration and an approximately 52 GB manual snapshot are in place; a historical OS/Jellyfin configuration restore succeeded, but current file-level contents have not been checked |
+| Proxmox environment | Proxmox backup job, daily at 04:00 local time | Dedicated partition on the Jellyfin host | Latest 7 plus 4 weekly | Not documented | Schedule, target, and retention are configured; a VM 100 restore test succeeded, but current execution history and complete job scope were not inspected |
 | Media archive | No current backup | None | Not applicable | Entire archive is outside the protected data set | No replication or backup; this risk is accepted |
 
 Exact internal mount paths, storage identifiers, job configuration, credentials, and backup filenames are intentionally omitted.
@@ -58,7 +58,7 @@ Timeshift is configured in RSYNC mode for Jellyfin-host system snapshots. Daily 
 
 The large media HDD filesystems are outside snapshot scope. The completed-downloads directory is explicitly excluded and contained approximately 578 GB of replaceable downloaded media at baseline. The root filesystem contained approximately 639 GB before exclusions, with the overwhelming majority attributable to that excluded directory. The exact exclusion path is retained in the internal inventory but omitted here because the architectural relationship is sufficient for public documentation.
 
-This describes the configured snapshot scope, not a verified file-level manifest. Seerr, Bazarr, and Prowlarr configuration files are included in Timeshift scope, but their presence was not independently inspected and the current Docker configuration has not been separately restore-tested.
+This describes the configured snapshot scope; a current file-level manifest is unavailable. Seerr, Bazarr, and Prowlarr configuration files are included in Timeshift scope, but their presence has not been checked and the current Docker configuration has not been separately restore-tested.
 
 ### Current status
 
@@ -70,13 +70,13 @@ This describes the configured snapshot scope, not a verified file-level manifest
 | Target configured | Dedicated approximately 125 GB SSD |
 | Initial manual execution | Snapshot created on 2026-10-01; size approximately 52 GB |
 | Snapshot artifacts independently inspected | No |
-| Included files verified | Historical restore verified the OS and important Jellyfin configuration/user files; current file-level manifest not verified |
+| Included files | A historical restore recovered the OS and important Jellyfin configuration/user files; no current file-level manifest is available |
 | Media exclusions | Large media filesystems outside scope; completed-downloads directory explicitly excluded |
 | Docker persistent state | Seerr, Bazarr, and Prowlarr configuration inclusion is configured; not independently inspected or separately restore-tested |
 | Restore performed | Yes; successful historical root-filesystem recovery |
 | Incident downtime | Approximately 2 hours total |
 | Data outcome | Important data preserved |
-| Isolated restore-operation duration | Unknown |
+| Isolated restore-operation duration | Not documented |
 
 The daily schedule expresses intended snapshot frequency. The historical restore recovered the OS and important Jellyfin configuration/user files in that incident; it does not establish a current daily recovery point. Docker configuration was copied manually during that incident; its current Timeshift inclusion is configured but not separately restore-tested.
 
@@ -97,7 +97,7 @@ The schedule is documented in host-local time because the underlying job is not 
 
 The target is physically separate from the Proxmox NVMe device but remains inside the same local two-host environment. The target's internal path is intentionally omitted.
 
-The authoritative Proxmox configuration and exact backup selection were not inspected. It is therefore unknown whether every LXC, VM, host configuration item, or stopped guest is included. The existence of VM 100 and dormant VM 103 does not show that either appears in the job selection.
+I haven't inspected the authoritative Proxmox configuration or the full backup selection, so I can't say whether every LXC, VM, host configuration item, or stopped guest is included. The existence of VM 100 and dormant VM 103 does not show that either appears in the job selection.
 
 ### Current status
 
@@ -108,10 +108,10 @@ The authoritative Proxmox configuration and exact backup selection were not insp
 | Retention configured | Latest 7 plus 4 weekly |
 | Recent successful executions confirmed | Current job history not yet reviewed |
 | Backup artifacts inspected | Not inspected directly |
-| Guest selection verified | VM 100 is known to have been recoverable; complete selection remains unknown |
-| Backup integrity checks verified | Unknown |
+| Guest selection | VM 100 was restored successfully; the complete job selection is undocumented |
+| Backup integrity checks verified | Not documented |
 | Guest restore performed | VM 100 successfully restored as a test; expected state recovered |
-| Restore duration | Unknown |
+| Restore duration | Not documented |
 
 Configured retention limits the intended on-target history. The VM 100 test demonstrates restoration for that guest, but does not show successful creation, pruning, integrity, or restorability for every configured guest.
 
@@ -144,7 +144,7 @@ No off-site, cloud, or geographically separate backup is in place. None should b
 |---|---|
 | Jellyfin physical host | Hosts the Proxmox target and runs the Timeshift-protected system |
 | Dedicated approximately 125 GB SSD | Holds Timeshift RSYNC-mode snapshots |
-| Dedicated Jellyfin-host partition | Receives Proxmox backups; relationship to the Timeshift SSD is not established |
+| Dedicated Jellyfin-host partition | Receives Proxmox backups; relationship to the Timeshift SSD is not confirmed |
 | Private home LAN | Required for Proxmox to reach its remote target |
 | Source-system availability | Required for scheduled jobs unless the mechanism supports otherwise; exact behavior was not inspected |
 
@@ -163,7 +163,7 @@ No off-site, cloud, or geographically separate backup is in place. None should b
 - any state created after the latest successful backup, if successful backups exist;
 - off-site copies, because no off-site mechanism is established.
 
-### Not yet verified
+### Checks still outstanding
 
 - independently inspected contents of the approximately 52 GB manual Timeshift snapshot;
 - independent verification of Seerr, Bazarr, and Prowlarr configuration in a completed snapshot;
@@ -188,7 +188,7 @@ These checks remain outstanding; their absence does not establish failure.
 
 ## Current limits
 
-The following remain unknown or untested:
+I haven't documented or tested the following:
 
 - RPO or RTO;
 - backup success rate;

@@ -1,74 +1,96 @@
-# Self-Hosted Infrastructure Environment
+# Self-Hosted Infrastructure | Systems Administration Portfolio
 
-A compact, two-host self-hosted environment supporting media, automation, monitoring, and game services used by 20+ people over time. I operate and maintain the environment and document its architecture, operational decisions, and recovery history.
+**Linux · Proxmox VE · Networking · Virtualization · Monitoring · Disaster Recovery**
+
+I independently operate and maintain a two-host Linux environment delivering media, automation, monitoring, and game services used by **20+ people over time**. This repository documents the systems behind those services, the operational decisions I have made, and how I investigate and recover from real failures.
+
+## At a glance
+
+| Area | Environment and responsibility |
+| --- | --- |
+| Infrastructure | Two physical Linux hosts: a standalone Proxmox VE server and a dedicated Ubuntu/Jellyfin server |
+| Virtualization | Six unprivileged LXC workloads and an on-demand QEMU game-server VM |
+| Networking | Private LAN, cross-host NFS storage, Tailscale overlay access, external VPS ingress, and workload-specific VPN egress |
+| Monitoring | Prometheus, Grafana, Proxmox exporter, and Node Exporter |
+| Operations | Service troubleshooting, system recovery, backup configuration, dependency management, and technical documentation |
+
+## Selected engineering outcomes
+
+- **Recovered core services after a Linux root-filesystem failure in approximately two hours.** Restored the Ubuntu host from a Timeshift snapshot, recovered additional configuration manually, and verified application and cross-host NFS functionality. [Read the recovery incident report](operations/incidents/2026-01-jellyfin-root-filesystem-recovery.md).
+- **Resolved a Proxmox startup-blocking NFS dependency.** Diagnosed a failure after a power outage, changed host mount behavior to allow degraded startup, and validated the remediation by deliberately bringing down the NFS host. [Read the NFS incident report](operations/incidents/2026-07-proxmox-nfs-startup-dependency.md).
+- **Successfully restored a game-server VM from backup during a controlled recovery test.** See the [backup strategy](operations/backups.md) and [disaster recovery](operations/disaster-recovery.md) documentation.
 
 ## Architecture
 
-- **Standalone Proxmox VE host:** Debian-based virtualization host running six intentionally unprivileged LXC services and a QEMU game-server VM.
-- **Dedicated Jellyfin host:** Ubuntu system running Jellyfin natively, attached media storage, NFS exports for Proxmox, and supporting Docker workloads.
-- **Private LAN and overlay access:** The two hosts share a private LAN. Selected Jellyfin and game-server paths use an external VPS and Tailscale for public ingress; other services have no intentionally published inbound path.
-- **Shared storage:** Media storage is served from the Jellyfin host to Proxmox over NFS. qBittorrent uses Proton VPN for its outbound path.
+- **Proxmox VE host:** Runs six unprivileged LXC workloads for infrastructure and media automation, alongside a QEMU game-server VM enabled when needed.
+- **Ubuntu/Jellyfin host:** Runs Jellyfin natively, supporting Docker applications, NFS media exports, and backup/snapshot storage.
+- **Remote connectivity:** Selected public services use an external VPS and Tailscale. Other internal services have no intentionally published inbound path.
+- **Shared storage:** The Ubuntu host serves media over NFS to Proxmox, centralizing media storage on the dedicated server.
 
 ```mermaid
 flowchart LR
     USERS["Service users"] --> VPS["External VPS ingress"]
-    VPS --> TS["Tailscale overlay"]
+    VPS --> TS["Tailscale / public service path"]
 
     subgraph LAN["Private home LAN"]
         subgraph PVE["Standalone Proxmox VE host"]
             PVEHOST["Proxmox host"]
-            LXC["Six unprivileged LXCs<br/>media automation, reverse proxy,<br/>downloads, and monitoring"]
-            GAME["QEMU game-server VM<br/>Minecraft / Project Zomboid<br/>enabled when needed"]
+            LXC["Five other unprivileged LXCs<br/>automation, proxy, downloads,<br/>monitoring exporter"]
+            QBIT["qBittorrent LXC"]
+            GAME["QEMU game-server VM<br/>enabled when needed"]
         end
 
-        subgraph MEDIA["Dedicated Ubuntu Jellyfin host"]
-            JHOST["Jellyfin host"]
-            JELLY["Jellyfin<br/>native service"]
-            DOCKER["Docker media-support workloads"]
-            NFS["Media storage<br/>NFS exports"]
+        subgraph MEDIA["Dedicated Ubuntu/Jellyfin host"]
+            JHOST["Ubuntu host"]
+            JELLY["Jellyfin native service"]
+            DOCKER["Docker support workloads"]
+            NFS["Media storage / NFS exports"]
             PVE_BACKUP["Proxmox backup target"]
             SNAP["Timeshift snapshot storage"]
         end
     end
 
-    TS -.->|"public service path"| JELLY
+    TS -.->|"selected public path"| JELLY
     TS -.->|"when enabled"| GAME
-    NFS <-->|"NFS media storage"| PVEHOST
-    PVEHOST -->|"scheduled Proxmox backups"| PVE_BACKUP
-    JHOST -->|"configured daily snapshots"| SNAP
-    LXC -->|"isolated egress"| VPN["Proton VPN"]
+    NFS <-->|"shared media"| PVEHOST
+    PVEHOST -->|"scheduled backups"| PVE_BACKUP
+    JHOST -->|"configured snapshots"| SNAP
+    QBIT -->|"isolated outbound traffic"| VPN["Proton VPN"]
 ```
 
-Public ingress is intentionally shown at a high level; detailed routing and reverse-proxy configuration are omitted from this overview.
+*Public ingress and reverse-proxy routing are shown at a high level to protect internal configuration details.* See the [network architecture](architecture/network.md) and [service placement](architecture/services.md) documents for additional technical detail.
 
-## Major technologies
+## Technologies and operational work
 
-- Proxmox VE, LXC, QEMU, and LVM-thin storage
-- Debian and Ubuntu Server
-- Jellyfin, Docker, NFS, and attached HDD media storage
-- Sonarr, Radarr, qBittorrent, SABnzbd, Seerr, Prowlarr, and Bazarr
-- Tailscale overlay networking and Proton VPN workload egress
-- Prometheus, Grafana, Prometheus PVE Exporter, and Node Exporter
-- Timeshift system snapshots and scheduled Proxmox backups
+| Focus | Technologies and work |
+| --- | --- |
+| Linux and virtualization | Debian, Ubuntu Server, Proxmox VE, LXC, QEMU, LVM-thin; host and guest administration |
+| Networking and access | Tailscale, VPN routing, NFS, DNS, reverse proxying, and troubleshooting cross-host connectivity |
+| Applications | Jellyfin, Docker, Sonarr, Radarr, qBittorrent, SABnzbd, Seerr, Prowlarr, Bazarr, and game services |
+| Observability | Prometheus, Grafana, Prometheus PVE Exporter, Node Exporter, and operational log analysis |
+| Resilience | Timeshift snapshots, scheduled Proxmox backups, incident investigation, controlled recovery tests, and dependency remediation |
 
-## Operational responsibilities
+## Infrastructure monitoring
 
-- Operate physical hosts, virtual machines, unprivileged containers, and native/Docker services.
-- Deploy and troubleshoot media, monitoring, storage, and network-connected workloads.
-- Maintain cross-host NFS dependencies and overlay-based service access.
-- Monitor capacity and service health, validate backups, and test recovery paths.
-- Investigate incidents, improve failure behavior, and document known limitations without exposing credentials or unnecessary network details.
+Prometheus, Grafana, Node Exporter, and the Proxmox exporter are used to observe host availability, resource utilization, storage capacity, and virtualized workload behavior.
 
-## Reliability and recovery work
+### Proxmox and virtualized workloads
 
-- Recovered the Jellyfin host's root filesystem with Timeshift; core service downtime was approximately two hours.
-- Remediated an NFS startup dependency so Proxmox and its LXCs can start in a degraded state when the media host is unavailable.
-- Successfully restored the game-server VM from backup as a recovery test and salvaged readable data during a media-disk failure.
-- Maintain local system snapshots and scheduled Proxmox backups; the replaceable bulk media archive remains intentionally single-copy.
+![Proxmox resource monitoring](assets/proxmox-monitoring-sanitized.png)
 
-## Documentation
+*LXC and QEMU workload monitoring, including CPU, memory, and storage utilization.*
 
-- [Architecture overview](architecture/overview.md) · [Network architecture](architecture/network.md) · [Service placement](architecture/services.md)
-- [Proxmox host](systems/proxmox.md) · [Jellyfin host](systems/jellyfin-server.md)
-- [Monitoring](monitoring/overview.md) · [Backups](operations/backups.md) · [Disaster recovery](operations/disaster-recovery.md)
-- Incidents: [Jellyfin root-filesystem recovery](operations/incidents/2026-01-jellyfin-root-filesystem-recovery.md) · [Proxmox/NFS startup dependency](operations/incidents/2026-07-proxmox-nfs-startup-dependency.md)
+### Jellyfin host
+
+![Jellyfin host monitoring](assets/jellyfin-monitoring-sanitized.png)
+
+## Explore the documentation
+
+| Area | Documents |
+| --- | --- |
+| Architecture | [Overview](architecture/overview.md) · [Network](architecture/network.md) · [Service placement](architecture/services.md) |
+| Systems | [Proxmox host](systems/proxmox.md) · [Jellyfin host](systems/jellyfin-server.md) |
+| Operations | [Monitoring](monitoring/overview.md) · [Backup strategy](operations/backups.md) · [Disaster recovery](operations/disaster-recovery.md) |
+| Incident reports | [Linux filesystem recovery](operations/incidents/2026-01-jellyfin-root-filesystem-recovery.md) · [Proxmox/NFS startup dependency](operations/incidents/2026-07-proxmox-nfs-startup-dependency.md) |
+
+*I keep credentials, exact addresses, internal service endpoints, and sensitive configuration private.*

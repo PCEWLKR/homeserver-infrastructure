@@ -4,16 +4,17 @@
 
 ## Scope
 
-This document describes high-level connectivity without publishing exact addresses, domains, tunnel configuration, firewall rules, credentials, or provider-assigned ports. Detailed packet-filter policy and the complete reverse-proxy request path are not documented.
+This document describes high-level connectivity without publishing exact addresses, domains, tunnel configuration, firewall rules, credentials, or provider-assigned ports. Detailed firewall and tailnet access-control policy are intentionally omitted.
 
 ## Connectivity model
 
 ```mermaid
 flowchart LR
-    CLIENTS["Public service clients"]
+    CLIENTS["External web clients"]
+    GAME_CLIENTS["External game clients"]
     INTERNET["Internet"]
-    VPS["IONOS VPS<br/>public ingress"]
-    INGRESSPATH["Tailscale service routing<br/>exact proxy hops unresolved"]
+    VPS["IONOS VPS<br/>Nginx HTTPS + iptables forwarding"]
+    TAILSCALE["Tailscale overlay"]
     PROTON["Proton VPN<br/>qBittorrent egress and<br/>provider-forwarded port"]
 
     subgraph HOME["Home environment"]
@@ -22,37 +23,58 @@ flowchart LR
 
         subgraph PVE["Proxmox physical host"]
             PHOST["Proxmox host<br/>primary Linux bridge"]
-            NPM["LXC 111<br/>Nginx Proxy Manager<br/>public-path role unresolved"]
+            NPM["LXC 111<br/>Nginx Proxy Manager"]
+            NPMLOCAL["NPM-local target<br/>application unknown"]
             QBIT["LXC 106<br/>qBittorrent"]
+            RADARR["LXC 108<br/>Radarr"]
+            SONARR["LXC 109<br/>Sonarr"]
+            SAB["LXC 112<br/>SABnzbd"]
             GAME["VM 100<br/>game server<br/>off at baseline"]
-            INTERNAL["Other Proxmox workloads<br/>no published inbound path"]
+            INTERNAL["Other Proxmox workloads<br/>inbound path not verified"]
         end
 
         subgraph MEDIA["Jellyfin physical host"]
             MHOST["Ubuntu host networking"]
             JELLY["Jellyfin"]
-            DOCKER["Media-supporting<br/>Docker workloads"]
+            SEERR["Seerr<br/>Docker workload"]
+            DOCKER["Other media-supporting<br/>Docker workloads"]
             NFS["NFS media exports"]
-            LOCAL["Other host services<br/>no published inbound path"]
+            LOCAL["Other host services<br/>inbound path not verified"]
         end
     end
 
     CLIENTS --> INTERNET --> VPS
-    VPS --> INGRESSPATH
-    INGRESSPATH -.->|"confirmed public destination"| JELLY
-    INGRESSPATH -.->|"confirmed destination when enabled"| GAME
+    GAME_CLIENTS --> INTERNET --> VPS
+    VPS -->|"HTTPS reverse proxy"| TAILSCALE
+    VPS -->|"DNAT / forwarding"| TAILSCALE
+    TAILSCALE --> JELLY
+    TAILSCALE --> SEERR
+    TAILSCALE --> GAME
 
     LAN --> ROUTER --> INTERNET
     LAN --> PHOST
     LAN --> MHOST
+    LAN --> NPM
     PHOST --> NPM
     PHOST --> QBIT
+    PHOST --> RADARR
+    PHOST --> SONARR
+    PHOST --> SAB
     PHOST --> GAME
     PHOST --> INTERNAL
     MHOST --> JELLY
+    MHOST --> SEERR
     MHOST --> DOCKER
     MHOST --> NFS
     MHOST --> LOCAL
+
+    NPM -.->|"separate configured HTTP upstreams"| JELLY
+    NPM -.-> SEERR
+    NPM -.-> QBIT
+    NPM -.-> RADARR
+    NPM -.-> SONARR
+    NPM -.-> SAB
+    NPM -.-> NPMLOCAL
 
     NFS <-->|"NFSv4.2 media traffic"| PHOST
     QBIT <-->|"VPN tunnel / forwarded-port path"| PROTON
@@ -61,14 +83,12 @@ flowchart LR
     classDef public fill:#fdecec,stroke:#a94442,color:#4a1515;
     classDef overlay fill:#eef3fb,stroke:#4777a8,color:#102a43;
     classDef internal fill:#eef7ee,stroke:#4f7d53,color:#173a1a;
-    classDef uncertain fill:#f4f4f5,stroke:#71717a,color:#3f3f46,stroke-dasharray:5 4;
-
-    class CLIENTS,INTERNET,VPS,PROTON public;
-    class LAN,ROUTER,PHOST,MHOST,JELLY,DOCKER,NFS,QBIT,GAME,INTERNAL,LOCAL internal;
-    class NPM,INGRESSPATH uncertain;
+    class CLIENTS,GAME_CLIENTS,INTERNET,VPS,PROTON public;
+    class TAILSCALE overlay;
+    class LAN,ROUTER,PHOST,MHOST,NPM,NPMLOCAL,JELLY,SEERR,DOCKER,NFS,QBIT,RADARR,SONARR,SAB,GAME,INTERNAL,LOCAL internal;
 ```
 
-Nginx Proxy Manager is in LXC 111, but its participation in the VPS-to-service request path is unknown. The diagram therefore shows its placement without connecting it to an unverified routing relationship.
+Nginx Proxy Manager (NPM) is in LXC 111 and provides a separate reverse-proxy configuration for Jellyfin, Seerr, qBittorrent, Radarr, Sonarr, SABnzbd, and one NPM-local loopback target whose application identity is unconfirmed. All seven configured upstreams use HTTP. This is not the VPS ingress path: VPS Nginx proxies Jellyfin and Seerr directly over Tailscale, while VPS iptables forwards game traffic to the game-server VM. The NPM routes are configured separately for LAN or other authorized private clients; their external reachability is not established.
 
 ## Home LAN
 
@@ -78,26 +98,23 @@ Both hosts have Wi-Fi hardware, but their wireless interfaces were down at basel
 
 ### Internal service reachability
 
-Services other than Jellyfin and the game-server path have no published inbound forwarding path. They may initiate outbound connections. The exposure model describes intended publication; implementation details remain unknown.
+Jellyfin and Seerr are the web services intentionally published through the IONOS VPS; game traffic has a separate configured forwarding path to the on-demand game-server VM. qBittorrent, Radarr, Sonarr, and SABnzbd administrative interfaces are intended to remain private. Limited unauthenticated reachability checks did not establish public access to these interfaces, but this does not prove that every alternate network path is blocked.
 
-Internal-only or non-published services include the Proxmox management plane, monitoring components, media automation workloads, download automation, NFS, SSH administration, and the media-supporting Docker applications unless they are reached from an already authorized internal path.
+NPM labels all seven proxy hosts “Publicly Accessible,” meaning no NPM access list is assigned. This is an NPM access-control setting, not proof of Internet reachability; if a request reaches one of these hosts through NPM, NPM applies no access-list restriction. Home-edge firewall/NAT reachability is not established. Detailed firewall and tailnet peer-authorization policy is intentionally omitted from this public document.
 
-Exact administrative reachability over Tailscale is not documented. Tailscale presence alone does not establish that every local listener is reachable by every overlay peer.
+The NPM administration interface was observed on the private LAN, and no NPM administration proxy host was present in its seven-host list. Its reachability through other network paths is not fully established.
 
 ## Tailscale and public ingress
 
-Tailscale interfaces are present on both physical hosts. Tailscale links public service paths to an IONOS VPS.
+Tailscale connects the IONOS VPS and home hosts, carrying the confirmed web and game-server ingress paths. User-confirmed hardening has since applied least-privilege access controls to the VPS role and tightened IONOS ingress and administrative controls; implementation details are intentionally omitted.
 
-Two services are intentionally public-facing:
-
-1. **Jellyfin** — public clients use a domain-based entry point that reaches the IONOS VPS, then traverses the Tailscale overlay toward the Jellyfin host.
-2. **Video-game server** — VM 100 has a similar VPS/Tailscale public path when the VM and service are enabled. The VM was powered off at baseline.
+Jellyfin and Seerr are the web services confirmed as intentionally public-facing. Public clients reach Nginx on the IONOS VPS over HTTPS; Nginx forwards requests directly over Tailscale to the Ubuntu media host, bypassing NPM. The VPS also forwards configured Minecraft and Project Zomboid game traffic with iptables DNAT over Tailscale to the on-demand game-server VM. These forwarding rules do not establish that guest applications are currently running or reachable. The VPS advertises no subnet routes and is not an exit node.
 
 During a historical 12-hour IONOS outage, about 10 of the environment's 20+ users temporarily retained Jellyfin access through a restricted, sanitized Tailscale path that did not depend on the unavailable normal VPS route. Their access returned promptly after they enabled the VPN; users without tailnet access remained affected until the normal path recovered. Exact peer policy and access details are intentionally omitted.
 
 This design avoids relying on direct publication of the broader home LAN. Exact domains, public addresses, tunnel addresses, VPS listener configuration, and cryptographic material are intentionally omitted.
 
-The complete sequence of reverse-proxy hops is still unknown. Nginx Proxy Manager is present, but its relationship to the VPS and each public service was not verified and is not asserted in the diagram.
+NPM has seven configured HTTP-upstream proxy hosts: Jellyfin, Seerr, qBittorrent, Radarr, Sonarr, SABnzbd, and one unresolved NPM-local target. NPM is separate from the confirmed VPS ingress path. Its certificate configuration covers Jellyfin, Seerr, and SABnzbd: HTTPS redirection and HTTP/2 are enabled for Jellyfin and Seerr; SABnzbd has a certificate assigned without forced HTTPS redirection. HSTS is disabled on these certificate-backed hosts. These NPM settings describe the separate proxy hosts and do not establish their Internet reachability.
 
 ## qBittorrent and Proton VPN
 
@@ -106,7 +123,7 @@ qBittorrent runs in unprivileged LXC 106. Its external connectivity has two deli
 - outbound qBittorrent traffic uses Proton VPN rather than the normal LAN egress path;
 - qBittorrent is bound to the port forwarded by Proton VPN.
 
-This is a workload-specific traffic-isolation decision. No VPN endpoint, address, credential, protocol configuration, firewall rule, or forwarded port number is recorded. Detailed leak-prevention or fail-closed behavior was not inspected and must not be assumed.
+qBittorrent fails closed when the VPN path drops; it does not fall back to normal LAN egress. This behavior has been tested. VPN endpoints, addresses, credentials, protocol configuration, firewall rules, and forwarded port numbers are intentionally omitted.
 
 ## NFS storage traffic
 
@@ -116,38 +133,38 @@ The exact export definitions, per-client permissions, and mapping of individual 
 
 A storm-related power outage caused Proxmox to start before the Jellyfin/NFS host. All three mounts entered a persistent blocking state that affected the Proxmox web interface and media-management workloads. The host mount configuration was changed afterward to use `nofail` with a reduced timeout so unavailable NFS shares produce degraded behavior rather than blocking startup.
 
-The remediation was tested by powering off the Jellyfin host. Proxmox and its LXCs started normally while media functions remained degraded until NFS returned. Automatic restart behavior and Wake-on-LAN procedures were also enabled for the Jellyfin host. NFS availability is now monitored through Prometheus and Grafana, although exact scrape and alert configuration remains unknown.
+The remediation was tested by powering off the Jellyfin host. Proxmox and its LXCs started normally while media functions remained degraded until NFS returned. Automatic restart behavior and Wake-on-LAN procedures were also enabled for the Jellyfin host. NFS availability is now monitored through Prometheus and Grafana, although exact scrape and alert configuration has not been documented.
 
 ## Host-local container networking
 
 The Jellyfin host had three active Docker bridges, three virtual Ethernet interfaces, and three Docker network namespaces supporting Seerr, Bazarr, and Prowlarr. Seerr's published listener was mapped directly; exact process-to-container mappings for Bazarr and Prowlarr remain unavailable. Container network names, address ranges, and detailed publication rules remain undocumented.
 
-On Proxmox, six LXC virtual Ethernet interfaces were attached to the primary bridge. Docker/containerd processes were also visible inside the LXC process tree, indicating nested container activity, but the responsible guest and network design were not established.
+On Proxmox, six LXC virtual Ethernet interfaces were attached to the primary bridge. Docker/containerd processes were also visible inside the LXC process tree, indicating nested container activity, but the responsible guest and network design were not confirmed.
 
 ## Traffic and exposure summary
 
 | Source | Destination | Purpose | Exposure note |
 |---|---|---|---|
-| Public clients | IONOS VPS, then Jellyfin over Tailscale | Media access | Intentionally public; exact domain and endpoints omitted |
-| Public clients | IONOS VPS, then VM 100 over Tailscale | Game access when enabled | Intentionally public; VM was off at baseline |
+| Public web clients | IONOS VPS / Nginx, then Jellyfin and Seerr over Tailscale | Media access | Intentionally public; NPM is not in this path |
 | Proxmox host | Jellyfin host | Three NFSv4.2 media mounts | Private LAN relationship |
 | qBittorrent LXC | Proton VPN / Internet | Isolated application egress | Provider-forwarded port; details omitted |
-| LAN clients | Internal applications and management services | Local service use and administration | No intentionally published inbound Internet path |
-| Both physical hosts | Tailscale overlay | Overlay connectivity | Peer policy and complete reachability unknown |
+| LAN clients | Internal applications and management services | Local service use and administration | Intended private; public reachability is not fully verified |
+| Public game clients | IONOS VPS / iptables forwarding, then game-server VM over Tailscale | Minecraft and Project Zomboid traffic | Forwarding is configured; VM services are on demand and end-to-end availability is not implied |
+| LAN or authorized private clients | Nginx Proxy Manager, then configured HTTP upstreams | Separate application reverse proxy | No NPM access lists are assigned; this does not establish Internet reachability |
+| VPS and home hosts | Tailscale overlay | Encrypted connectivity for public service ingress | The VPS advertises no subnet routes and is not configured as an exit node; detailed peer-authorization policy is intentionally omitted |
 | Approximately 10 trusted users | Restricted Tailscale path to Jellyfin | Temporary access during a 12-hour normal VPS-path outage | Access returned promptly after VPN activation; exact peers and policy omitted |
 | Proxmox host | Jellyfin backup partition | Scheduled Proxmox backups | Internal storage path; filesystem path omitted here |
 
-## Security boundaries and unknowns
+## Security boundaries and private details
 
-The architecture establishes separation between private LAN traffic, Tailscale-based public paths, and qBittorrent's Proton VPN path. It does not establish:
+The documentation distinguishes known private-LAN traffic, Tailscale-based public paths, and qBittorrent's Proton VPN egress path. It does not establish:
 
 - exact firewall or NAT rules;
-- Tailscale ACLs or peer authorization;
-- VPS reverse-proxy and TLS configuration;
+- detailed Tailscale peer-authorization rules, which are intentionally omitted from this public document;
+- detailed VPS Nginx TLS and forwarded-client-IP directives;
 - DNS provider or record design;
-- whether Nginx Proxy Manager handles one or both public services;
 - Docker publication policy beyond the current listeners;
 - VLANs or other LAN segmentation;
-- VPN fail-closed behavior for qBittorrent.
+- Detailed VPN implementation and qBittorrent's fail-closed configuration.
 
-These items remain unknown or intentionally withheld.
+I keep exact firewall, DNS, Tailscale, VPN, and VPS settings private. The documented public web and game paths use the VPS and Tailscale; NPM provides a separate application-proxy configuration.

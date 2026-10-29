@@ -119,7 +119,7 @@ This report does not assign a formal root-cause classification beyond the initia
 
 Permissions and ownership were partitioned more deliberately between the superuser and the regular SSH account. The regular account is now oriented toward work outside the root filesystem and toward cleanup, configuration, and monitoring tasks that do not require unrestricted root access.
 
-The intent is to reduce the routine need for elevated filesystem access. The effectiveness of these controls remains unverified.
+These controls are intended to reduce routine use of elevated filesystem access; their impact has not been assessed.
 
 ## Lessons learned
 
@@ -133,7 +133,7 @@ The intent is to reduce the routine need for elevated filesystem access. The eff
 ## Remaining limitations
 
 - The incident timeline is approximate and no command transcript or detailed log archive is available.
-- The exact restored-file manifest is unknown.
+- The exact restored-file manifest is not documented.
 - Docker configuration is now included in Timeshift scope, but that current configuration has not been restore-tested independently.
 - The NVIDIA patch was manually recovered; its current backup status was not separately verified.
 - The snapshot target remains inside the same physical laptop.
