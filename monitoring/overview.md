@@ -23,8 +23,6 @@ Sanitized examples: [Jellyfin host dashboard](../assets/jellyfin-monitoring-sani
 
 NFS availability is monitored through Prometheus and Grafana following a historical startup-dependency incident. The specific metric and dashboard implementation have not been recorded here.
 
-## Scope and limitations
+## Scope
 
-Exact scrape topology, component versions, retention, alert rules and thresholds, notification destinations, monitoring authentication, and backup/recovery arrangements are not documented in this public overview. Alerting or notification behavior has not been verified and is not claimed as a demonstrated capability. The location of Prometheus and Grafana within the LXC layer is also unknown.
-
-The screenshots are point-in-time examples. They do not establish continuous monitoring coverage, alerting, service-level objectives, or automated remediation. Implementation and validation details are intentionally omitted from this public overview.
+The dashboards show host and Proxmox/guest resource telemetry. Alerting, retention, and monitoring recovery are outside the scope of this overview; dashboard screenshots are point-in-time examples, not a description of alerting or service-level objectives.

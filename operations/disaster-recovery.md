@@ -173,7 +173,7 @@ This incident validates a limited access fallback, not full public-path redundan
 | Proxmox VM | Backup schedule, retention, sanitized target, and successful VM 100 restore test | Complete guest selection, LXC restore tests, VM 103 coverage, restore timing, artifact health history |
 | Media archive | Historical live-environment salvage and reacquisition strategy | Full inventory, integrity baseline, recovery throughput, spare-drive capacity, full-archive recovery time |
 | NFS outage | Failure sequence, `nofail` and timeout remediation, affected LXC paths, deliberate power-off validation, and current monitoring intent | Exact timeout value, complete monitoring implementation, tested behavior for every failure mode |
-| Public ingress | Normal VPS/Tailscale relationship and restricted trusted-user fallback | Exact routing, failover procedure, peer policy, DNS behavior, broader-user fallback |
+| Public ingress | VPS Nginx proxies Jellyfin and Seerr directly over Tailscale; separate VPS DNAT forwards game traffic to VM 100. Restricted trusted-user Tailscale fallback was used during an outage. | Fallback procedure, peer policy, DNS behavior, and broader-user fallback |
 | Monitoring | Component presence | Alerting, outage detection, notification, dashboard, and monitoring-recovery details |
 
 ## What recovery has demonstrated

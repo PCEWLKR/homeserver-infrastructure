@@ -148,7 +148,7 @@ Serving NFS from the media node lets Proxmox-hosted automation workloads share t
 
 ### Separate public ingress from the home edge
 
-Jellyfin and the game-server path use Tailscale connectivity to an IONOS VPS for normal public access. During a historical 12-hour VPS outage, about 10 of the 20+ users restored Jellyfin access promptly through a restricted, sanitized Tailscale path after enabling the VPN; other users remained affected until the normal path recovered. Other services have no intentionally published inbound path. Exact DNS, reverse-proxy, firewall, peer-policy, and tunnel configuration is intentionally omitted and was not fully established.
+Public web requests reach VPS Nginx, which proxies Jellyfin and Seerr directly over Tailscale; game traffic uses a separate VPS iptables DNAT path over Tailscale to VM 100 when enabled. Nginx Proxy Manager is separate from both ingress paths. During a historical 12-hour VPS outage, about 10 of the 20+ users restored Jellyfin access promptly through a restricted, sanitized Tailscale path after enabling the VPN; other users remained affected until the normal path recovered. Detailed DNS, firewall, peer-policy, and tunnel configuration is intentionally omitted.
 
 ### Isolate qBittorrent egress
 
