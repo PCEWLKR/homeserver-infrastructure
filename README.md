@@ -93,4 +93,4 @@ Prometheus, Grafana, Node Exporter, and the Proxmox exporter are used to observe
 | Operations | [Monitoring](monitoring/overview.md) · [Backup strategy](operations/backups.md) · [Disaster recovery](operations/disaster-recovery.md) |
 | Incident reports | [Linux filesystem recovery](operations/incidents/2026-01-jellyfin-root-filesystem-recovery.md) · [Proxmox/NFS startup dependency](operations/incidents/2026-07-proxmox-nfs-startup-dependency.md) |
 
-*I keep credentials, exact addresses, internal service endpoints, and sensitive configuration private. Where I haven't checked a detail or tested a behavior, I say so rather than present an assumption as fact.*
+*I keep credentials, exact addresses, internal service endpoints, and sensitive configuration private.*
