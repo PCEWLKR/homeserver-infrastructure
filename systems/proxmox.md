@@ -65,7 +65,7 @@ All six LXC guests were running at baseline. Their unprivileged configuration an
 | 106 | qBittorrent | Running | Media download workload with Proton VPN egress |
 | 108 | Radarr | Running | Media automation |
 | 109 | Sonarr | Running | Media automation |
-| 111 | Nginx Proxy Manager | Running | Reverse-proxy component; exact public-path role not documented |
+| 111 | Nginx Proxy Manager | Running | Application proxy with configured routes; separate from VPS public ingress |
 | 112 | SABnzbd | Running | Download automation |
 
 Each guest had a running per-container systemd unit, an `lxc-start` process, a bridge-attached virtual Ethernet interface, and a guest LVM volume. The separate LXCs create distinct service lifecycle and container privilege boundaries; guest configuration and effective isolation are outside this document.
@@ -79,7 +79,7 @@ Docker/containerd runs within the Proxmox LXC layer, but the responsible guest a
 | 100 | Game server | Powered off at baseline; only VM currently in use |
 | 103 | Windows Server lab | Inactive and not recently used |
 
-VM 100 has hosted Minecraft and Project Zomboid. Its current in-guest installation and service state are not documented. When enabled, its public service path uses an IONOS VPS and Tailscale; exact routing and reverse-proxy hops have not yet been mapped.
+VM 100 has hosted Minecraft and Project Zomboid. Its current in-guest installation and service state are not documented. When enabled, the VPS uses iptables DNAT and masquerading to forward configured game traffic over Tailscale to the VM. This is separate from public web proxying; the VM and its services must be running for game access.
 
 VM 103 supported historical Windows Server and domain-controller experimentation. It does not represent a current Active Directory service and is outside the repository's current service scope. No additional guests are documented.
 
@@ -89,10 +89,11 @@ The host has one active wired uplink attached to a primary Linux bridge on the p
 
 A Tailscale interface and overlay routes were active. Tailscale participates in the public path for VM 100 when the game service is enabled and in broader environment connectivity, but peer policy and complete host-listener reachability are not confirmed.
 
-The intended exposure model is:
+The documented exposure model is:
 
-- Proxmox management and the LXC services do not have intentionally published inbound Internet paths;
-- VM 100 has a public path through the IONOS VPS and Tailscale when enabled;
+- Public web traffic reaches the IONOS VPS, where Nginx proxies Jellyfin and Seerr directly over Tailscale to the Jellyfin host; Nginx Proxy Manager in LXC 111 is not in this path;
+- Game traffic is forwarded separately by VPS iptables DNAT and masquerading over Tailscale to VM 100 when enabled;
+- Proxmox management and other LXC services do not have intentionally published inbound Internet paths;
 - qBittorrent in LXC 106 sends its external traffic through Proton VPN and uses the provider-forwarded port;
 - NFS media traffic remains on the private LAN between the two physical hosts.
 
@@ -112,7 +113,7 @@ Monitoring on or beneath this host includes:
 - `pve_exporter`, Prometheus, and Grafana processes in the LXC process tree;
 - Proxmox statistics and RRD services on the physical host.
 
-NFS availability is monitored through Prometheus and Grafana following the historical startup-dependency incident. The exact LXC placement of Prometheus and Grafana, metric source, scrape relationships, alert routing, retention, and dashboard ownership are not confirmed. The presence of these processes and NFS coverage does not establish a fully documented monitoring pipeline.
+NFS availability is monitored through Prometheus and Grafana following the historical startup-dependency incident. Grafana screenshots demonstrate host telemetry and Proxmox/guest resource dashboards. Exact scrape relationships, alert routing, retention, and dashboard ownership are not confirmed.
 
 ## Backup strategy
 

@@ -15,7 +15,7 @@ The environment separates smaller system/configuration recovery from bulk-media 
 - Jellyfin host system snapshots use Timeshift in RSYNC mode.
 - Proxmox has a scheduled backup job with defined retention on storage hosted by the Jellyfin node.
 - The media archive has no backup or replica; recovery relies on salvaging readable files and reacquiring replaceable content.
-- Public Jellyfin access normally depends on the IONOS VPS and Tailscale, with a restricted Tailscale fallback available to a subset of trusted users.
+- Public web access to Jellyfin and Seerr normally uses VPS Nginx over Tailscale; game traffic uses a separate VPS iptables DNAT path over Tailscale when VM 100 is enabled. A restricted Tailscale fallback has provided Jellyfin access to a subset of trusted users.
 - NFS mount behavior has been changed so storage unavailability no longer blocks Proxmox startup.
 
 This approach protects smaller operational state while accepting the cost and delay of media reacquisition. Both backup targets remain within the same local environment, so they do not provide off-site or site-level disaster protection.
@@ -103,11 +103,11 @@ NFS is a shared-service dependency between the physical hosts. During a storm-re
 
 The Proxmox host mount configuration now uses `nofail` with a reduced timeout. Storage is mounted at the host layer and selected paths are exposed to qBittorrent, Sonarr, Radarr, and SABnzbd. A deliberate test with the Jellyfin host powered off confirmed that Proxmox and its LXCs start in a degraded state. Applications can run, but media functions remain unavailable until NFS returns.
 
-Automatic restart and Wake-on-LAN procedures were enabled for the Jellyfin host. NFS availability is now monitored through Prometheus and Grafana; exact scrape and alert behavior have not been documented.
+Automatic restart and Wake-on-LAN procedures were enabled for the Jellyfin host. NFS availability is monitored through Prometheus and Grafana; exact scrape and alert behavior have not been documented.
 
 ### Public ingress
 
-Normal public Jellyfin and game-service paths depend on an IONOS VPS and Tailscale. The exact reverse-proxy chain has not yet been mapped.
+Normal public Jellyfin and Seerr web access uses Nginx on the IONOS VPS, proxying directly over Tailscale to the Jellyfin host. The game-server path is separate: VPS iptables DNAT forwards configured traffic over Tailscale to VM 100 when enabled. Nginx Proxy Manager is not in either public path. Exact addressing and filtering details remain private.
 
 During a historical IONOS outage, the normal public path was unavailable for approximately 12 hours. About 10 of the 20+ users had access to a restricted, sanitized Tailscale path and restored Jellyfin connectivity promptly after enabling the VPN. Users without that access remained affected until the provider path recovered.
 

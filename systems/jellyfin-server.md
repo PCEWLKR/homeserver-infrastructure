@@ -95,7 +95,7 @@ The three runtime instances align with these applications, although exact proces
 
 The host uses one active wired interface on the private home LAN. The default route uses the LAN gateway. A Wi-Fi interface was present but down at baseline.
 
-A Tailscale interface was active. Public Jellyfin access uses a domain-based entry point, an IONOS VPS, and the Tailscale overlay. During a historical 12-hour IONOS outage, about 10 of the environment's 20+ users temporarily accessed Jellyfin through a restricted, sanitized Tailscale path that bypassed the unavailable VPS route. Connectivity returned promptly for those users after they enabled the VPN; other users remained affected until the normal path recovered. I haven't mapped the full peer policy, reverse-proxy sequence, or Nginx Proxy Manager's role. I keep exact VPS, DNS, and tunnel configuration private.
+A Tailscale interface was active. Public web requests reach the IONOS VPS over HTTPS, where VPS Nginx proxies Jellyfin and Seerr directly over Tailscale to this host. Nginx Proxy Manager in LXC 111 is a separate application proxy and is not in this public ingress path. During a historical 12-hour IONOS outage, about 10 of the environment's 20+ users temporarily accessed Jellyfin through a restricted, sanitized Tailscale path that bypassed the unavailable VPS route. Connectivity returned promptly for those users after they enabled the VPN; other users remained affected until the normal path recovered. Exact VPS, DNS, and tunnel configuration remains private.
 
 The host also provides:
 
@@ -108,7 +108,7 @@ The last point describes intended exposure, not confirmed firewall behavior. Exa
 
 ## Monitoring
 
-Prometheus Node Exporter runs directly on this host. This establishes a host telemetry endpoint, but its collector, scrape interval, authentication, retention, dashboards, and alert routing are not documented.
+Prometheus Node Exporter runs directly on this host. A Grafana screenshot demonstrates host CPU, memory, and filesystem telemetry. Collector configuration, scrape interval, authentication, retention, and alert routing are not documented.
 
 Prometheus and Grafana processes run within the Proxmox-hosted LXC layer, but I haven't mapped their guest placement or relationship to this Node Exporter. I don't infer a complete monitoring flow.
 
